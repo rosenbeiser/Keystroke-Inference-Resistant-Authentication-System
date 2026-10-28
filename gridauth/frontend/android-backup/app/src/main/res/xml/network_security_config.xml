@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Network security config for LOCAL DEVELOPMENT only.
+  Allows cleartext HTTP to 10.0.2.2 (Android emulator localhost alias).
+  
+  PRODUCTION: Remove this file and use HTTPS endpoints only.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- Android emulator → host machine localhost -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <!-- Physical device LAN testing (replace with your server IP) -->
+        <domain includeSubdomains="false">192.168.1.100</domain>
+    </domain-config>
+</network-security-config>

@@ -1,0 +1,64 @@
+# ============================================================
+# gridauth/.gitignore
+# ============================================================
+
+# ---- Python / Backend ----
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+*.db              # SQLite database files — never commit
+*.sqlite
+*.sqlite3
+
+# Secret files — NEVER commit these
+backend/.env
+backend/*.key
+
+# ---- Flutter / Dart ----
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+frontend/build/
+frontend/.pub-cache/
+frontend/*.g.dart
+frontend/test/*.mocks.dart
+
+# Android build artifacts
+frontend/android/.gradle/
+frontend/android/app/build/
+frontend/android/local.properties
+frontend/android/key.properties      # signing keys
+
+# iOS (if ever added)
+frontend/ios/Pods/
+frontend/ios/.symlinks/
+frontend/ios/Flutter/App.framework
+frontend/ios/Flutter/Flutter.framework
+frontend/ios/Flutter/Generated.xcconfig
+frontend/ios/Runner.xcworkspace/
+
+# ---- IDE ----
+.idea/
+*.iml
+.vscode/
+*.suo
+*.user
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- Logs ----
+*.log
+logs/
