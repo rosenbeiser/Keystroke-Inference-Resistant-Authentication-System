@@ -2,6 +2,7 @@
 //
 // Application entry point.
 // Sets up Provider state management and initializes auth state from storage.
+// Also loads the persisted server URL from SharedPreferences at startup.
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -11,6 +12,7 @@ import 'screens/welcome_screen.dart';
 import 'screens/home_screen.dart';
 import 'services/api_service.dart';
 import 'services/secure_storage_service.dart';
+import 'services/server_config_service.dart';
 import 'state/auth_state.dart';
 import 'state/grid_state.dart';
 
@@ -63,6 +65,7 @@ class GridAuthApp extends StatelessWidget {
 }
 
 /// Determines initial route based on persisted session state.
+/// Also applies the saved server URL before any network call is made.
 class _AppRoot extends StatefulWidget {
   const _AppRoot();
 
@@ -80,6 +83,12 @@ class _AppRootState extends State<_AppRoot> {
   }
 
   Future<void> _init() async {
+    // Load persisted server URL and apply it to ApiService before any calls
+    final savedUrl = await ServerConfigService.getBaseUrl();
+    if (!mounted) return;
+    context.read<ApiService>().updateBaseUrl(savedUrl);
+
+    // Restore session
     await context.read<AuthState>().initialize();
     if (mounted) setState(() => _initialized = true);
   }

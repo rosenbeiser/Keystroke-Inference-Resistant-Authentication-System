@@ -28,6 +28,9 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     username: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    # Security level chosen at registration: 'normal' | 'strong' | 'powerful'
+    # Controls how many ghost nodes are added during authentication.
+    security_level: Mapped[str] = mapped_column(String(16), nullable=False, default="normal")
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 

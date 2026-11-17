@@ -24,12 +24,19 @@ class ApiException implements Exception {
 }
 
 class ApiService {
-  final String _base;
+  /// The base URL — overridable at runtime via [updateBaseUrl].
+  String _baseUrl;
   final http.Client _client;
 
   ApiService({String? baseUrl, http.Client? client})
-      : _base = (baseUrl ?? AppConfig.baseUrl) + AppConfig.apiPrefix,
+      : _baseUrl = (baseUrl ?? AppConfig.baseUrl) + AppConfig.apiPrefix,
         _client = client ?? http.Client();
+
+  /// Update the server URL at runtime (called after loading from SharedPreferences).
+  /// [url] should be just the base, e.g. 'http://192.168.0.103:8000'
+  void updateBaseUrl(String url) {
+    _baseUrl = url.replaceAll(RegExp(r'/+$'), '') + AppConfig.apiPrefix;
+  }
 
   Duration get _timeout =>
       const Duration(seconds: AppConfig.httpTimeoutSeconds);
@@ -54,22 +61,28 @@ class ApiService {
   // Registration
   // ---------------------------------------------------------------- //
 
-  Future<void> register(String username, String password) async {
+  Future<void> register(String username, String password, {String securityLevel = 'normal'}) async {
     try {
       final response = await _client
           .post(
-            Uri.parse('$_base/register'),
+            Uri.parse('$_baseUrl/register'),
             headers: _headers(),
-            body: jsonEncode({'username': username, 'password': password}),
+            body: jsonEncode({
+              'username': username,
+              'password': password,
+              'security_level': securityLevel,
+            }),
           )
           .timeout(_timeout);
       await _parse(response);
     } on SocketException {
-      throw const ApiException('Cannot reach the server. Check your network and make sure the backend is running.');
+      throw const ApiException(
+          'Cannot reach the server. Check your network and make sure the backend is running.');
     } on HttpException {
       throw const ApiException('Network error. Try again.');
     } on TimeoutException {
-      throw const ApiException('Request timed out. Is the server running and reachable from your device?');
+      throw const ApiException(
+          'Request timed out. Is the server running and reachable from your device?');
     }
   }
 
@@ -81,7 +94,7 @@ class ApiService {
     try {
       final response = await _client
           .post(
-            Uri.parse('$_base/auth/session'),
+            Uri.parse('$_baseUrl/auth/session'),
             headers: _headers(),
             body: jsonEncode({'username': username}),
           )
@@ -93,7 +106,8 @@ class ApiService {
     } on HttpException {
       throw const ApiException('Network error. Try again.');
     } on TimeoutException {
-      throw const ApiException('Request timed out. Check your server connection.');
+      throw const ApiException(
+          'Request timed out. Check your server connection.');
     }
   }
 
@@ -106,7 +120,7 @@ class ApiService {
     try {
       final response = await _client
           .post(
-            Uri.parse('$_base/auth/verify'),
+            Uri.parse('$_baseUrl/auth/verify'),
             headers: _headers(),
             body: jsonEncode({'nonce': nonce, 'selections': selections}),
           )
@@ -117,7 +131,8 @@ class ApiService {
     } on HttpException {
       throw const ApiException('Network error. Try again.');
     } on TimeoutException {
-      throw const ApiException('Request timed out. Check your server connection.');
+      throw const ApiException(
+          'Request timed out. Check your server connection.');
     }
   }
 
@@ -129,7 +144,7 @@ class ApiService {
     try {
       await _client
           .post(
-            Uri.parse('$_base/auth/logout'),
+            Uri.parse('$_baseUrl/auth/logout'),
             headers: _headers(bearerToken: sessionToken),
           )
           .timeout(_timeout);
@@ -146,7 +161,7 @@ class ApiService {
     try {
       final response = await _client
           .get(
-            Uri.parse('$_base/auth/status'),
+            Uri.parse('$_baseUrl/auth/status'),
             headers: _headers(bearerToken: sessionToken),
           )
           .timeout(_timeout);

@@ -1,6 +1,6 @@
 // lib/screens/registration_screen.dart
 //
-// FR-01: User registration with randomized on-screen keyboard.
+// FR-01: User registration with the device's standard QWERTY keyboard.
 // Shows both Password and Confirm Password fields simultaneously.
 // Eye-icon toggles reveal/hide for each field.
 
@@ -8,7 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../services/api_service.dart';
-import '../widgets/randomized_keyboard.dart';
 import '../widgets/error_banner.dart';
 import '../widgets/loading_overlay.dart';
 
@@ -21,11 +20,14 @@ class RegistrationScreen extends StatefulWidget {
 
 class _RegistrationScreenState extends State<RegistrationScreen> {
   final _usernameController = TextEditingController();
-  String _password = '';
-  String _confirmPassword = '';
+  final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
 
-  /// Which field the keyboard currently types into: 'password' or 'confirm'
-  String _activeField = 'password';
+  final _passwordFocus = FocusNode();
+  final _confirmFocus = FocusNode();
+
+  // Security level chosen by the user: 'normal' | 'strong' | 'powerful'
+  String _securityLevel = 'normal';
 
   bool _showPassword = false;
   bool _showConfirm = false;
@@ -36,44 +38,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   @override
   void dispose() {
     _usernameController.dispose();
+    _passwordController.dispose();
+    _confirmController.dispose();
+    _passwordFocus.dispose();
+    _confirmFocus.dispose();
     super.dispose();
-  }
-
-  // ------------------------------------------------------------------ //
-  // Display helpers
-  // ------------------------------------------------------------------ //
-
-  String _mask(String value, bool visible) =>
-      visible ? value : '•' * value.length;
-
-  // ------------------------------------------------------------------ //
-  // Keyboard callbacks
-  // ------------------------------------------------------------------ //
-
-  void _onChar(String c) {
-    setState(() {
-      if (_activeField == 'password') {
-        _password += c;
-      } else {
-        _confirmPassword += c;
-      }
-      _error = null;
-    });
-  }
-
-  void _onDelete() {
-    setState(() {
-      if (_activeField == 'password' && _password.isNotEmpty) {
-        _password = _password.substring(0, _password.length - 1);
-      } else if (_activeField == 'confirm' && _confirmPassword.isNotEmpty) {
-        _confirmPassword =
-            _confirmPassword.substring(0, _confirmPassword.length - 1);
-      }
-    });
-  }
-
-  void _onConfirm() {
-    _submit();
   }
 
   // ------------------------------------------------------------------ //
@@ -81,7 +50,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   // ------------------------------------------------------------------ //
 
   String? _validatePassword(String pw) {
-    if (pw.length < 8) return 'Password must be at least 8 characters.';
+    if (pw.length < 6) return 'Password must be at least 6 characters.';
     if (!pw.contains(RegExp(r'[A-Z]'))) {
       return 'Password needs an uppercase letter.';
     }
@@ -93,12 +62,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   }
 
   Future<void> _submit() async {
-    final pwErr = _validatePassword(_password);
+    final password = _passwordController.text;
+    final confirm = _confirmController.text;
+
+    final pwErr = _validatePassword(password);
     if (pwErr != null) {
       setState(() => _error = pwErr);
       return;
     }
-    if (_password != _confirmPassword) {
+    if (password != confirm) {
       setState(() => _error = 'Passwords do not match.');
       return;
     }
@@ -115,14 +87,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
     final api = context.read<ApiService>();
     try {
-      await api.register(username, _password);
+      await api.register(username, password, securityLevel: _securityLevel);
       if (mounted) {
         setState(() {
           _isLoading = false;
           _success = 'Account created! You can now sign in.';
-          _password = '';
-          _confirmPassword = '';
-          _activeField = 'password';
+          _passwordController.clear();
+          _confirmController.clear();
         });
       }
     } on ApiException catch (e) {
@@ -130,99 +101,47 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         setState(() {
           _isLoading = false;
           _error = e.message;
-          _password = '';
-          _confirmPassword = '';
-          _activeField = 'password';
+          _passwordController.clear();
+          _confirmController.clear();
         });
       }
     }
   }
 
   // ------------------------------------------------------------------ //
-  // Password field widget (shared between password & confirm)
+  // Build
   // ------------------------------------------------------------------ //
 
-  Widget _buildPasswordField({
-    required String label,
-    required String fieldKey,
-    required String value,
-    required bool visible,
-    required VoidCallback onToggleVisibility,
+  InputDecoration _fieldDecoration({
     required String hint,
+    required IconData prefixIcon,
+    required bool visible,
+    required VoidCallback onToggle,
   }) {
-    final isActive = _activeField == fieldKey;
-    return GestureDetector(
-      onTap: () => setState(() => _activeField = fieldKey),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label,
-              style: GoogleFonts.outfit(color: Colors.white60, fontSize: 13)),
-          const SizedBox(height: 6),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E1B38),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isActive
-                    ? const Color(0xFF6C63FF)
-                    : Colors.white.withValues(alpha: 0.06),
-                width: isActive ? 1.5 : 1,
-              ),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.lock_outline,
-                    color: Colors.white38, size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: value.isEmpty
-                      ? Text(
-                          hint,
-                          style: const TextStyle(
-                              color: Colors.white24, fontSize: 13),
-                        )
-                      : Text(
-                          _mask(value, visible),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            letterSpacing: 4,
-                          ),
-                        ),
-                ),
-                // Eye toggle button
-                GestureDetector(
-                  onTap: onToggleVisibility,
-                  child: Icon(
-                    visible ? Icons.visibility_off : Icons.visibility,
-                    color: Colors.white38,
-                    size: 20,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (isActive)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                fieldKey == 'password'
-                    ? 'Typing here — min 8 chars, upper + lower + digit'
-                    : 'Re-enter your password to confirm',
-                style: const TextStyle(color: Color(0xFF9F97FF), fontSize: 11),
-              ),
-            ),
-        ],
+    return InputDecoration(
+      filled: true,
+      fillColor: const Color(0xFF1E1B38),
+      hintText: hint,
+      hintStyle: const TextStyle(color: Colors.white30),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFF6C63FF), width: 1.5),
+      ),
+      prefixIcon: Icon(prefixIcon, color: Colors.white38, size: 20),
+      suffixIcon: IconButton(
+        icon: Icon(
+          visible ? Icons.visibility_off : Icons.visibility,
+          color: Colors.white38,
+          size: 20,
+        ),
+        onPressed: onToggle,
       ),
     );
   }
-
-  // ------------------------------------------------------------------ //
-  // Build
-  // ------------------------------------------------------------------ //
 
   @override
   Widget build(BuildContext context) {
@@ -246,113 +165,345 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       body: LoadingOverlay(
         isLoading: _isLoading,
         message: 'Creating account...',
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Success banner
-              if (_success != null)
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1A3D1A),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                        color: Colors.greenAccent.withValues(alpha: 0.3)),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Success banner ──────────────────────────────────────
+                if (_success != null)
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A3D1A),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                          color: Colors.greenAccent.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check_circle,
+                            color: Colors.greenAccent),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(_success!,
+                              style:
+                                  const TextStyle(color: Colors.greenAccent)),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: Row(
+
+                // ── Error banner ────────────────────────────────────────
+                if (_error != null) ...[
+                  ErrorBanner(
+                    message: _error!,
+                    onDismiss: () => setState(() => _error = null),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // ── Username ────────────────────────────────────────────
+                Text('Username',
+                    style: GoogleFonts.outfit(
+                        color: Colors.white60, fontSize: 13)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: _usernameController,
+                  style: const TextStyle(color: Colors.white),
+                  keyboardType: TextInputType.text,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  textInputAction: TextInputAction.next,
+                  onSubmitted: (_) =>
+                      FocusScope.of(context).requestFocus(_passwordFocus),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: const Color(0xFF1E1B38),
+                    hintText: 'e.g. john_doe',
+                    hintStyle: const TextStyle(color: Colors.white30),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                          color: Color(0xFF6C63FF), width: 1.5),
+                    ),
+                    prefixIcon: const Icon(Icons.person_outline,
+                        color: Colors.white38),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // ── Password ────────────────────────────────────────────
+                Text('Set Password',
+                    style: GoogleFonts.outfit(
+                        color: Colors.white60, fontSize: 13)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: _passwordController,
+                  focusNode: _passwordFocus,
+                  style: const TextStyle(color: Colors.white),
+                  obscureText: !_showPassword,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  textInputAction: TextInputAction.next,
+                  onSubmitted: (_) =>
+                      FocusScope.of(context).requestFocus(_confirmFocus),
+                  decoration: _fieldDecoration(
+                    hint: 'Min 6 chars, upper + lower + digit',
+                    prefixIcon: Icons.lock_outline,
+                    visible: _showPassword,
+                    onToggle: () =>
+                        setState(() => _showPassword = !_showPassword),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // ── Confirm Password ────────────────────────────────────
+                Text('Confirm Password',
+                    style: GoogleFonts.outfit(
+                        color: Colors.white60, fontSize: 13)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: _confirmController,
+                  focusNode: _confirmFocus,
+                  style: const TextStyle(color: Colors.white),
+                  obscureText: !_showConfirm,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _submit(),
+                  decoration: _fieldDecoration(
+                    hint: 'Re-enter your password',
+                    prefixIcon: Icons.lock_outline,
+                    visible: _showConfirm,
+                    onToggle: () =>
+                        setState(() => _showConfirm = !_showConfirm),
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // ── Password rules hint ─────────────────────────────────
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    'At least 6 characters · one uppercase · one lowercase · one digit',
+                    style: TextStyle(color: Color(0xFF9F97FF), fontSize: 11),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // ── Security Level Selector ─────────────────────────────
+                Text('Authentication Security Level',
+                    style: GoogleFonts.outfit(
+                        color: Colors.white60, fontSize: 13)),
+                const SizedBox(height: 10),
+                _SecurityLevelSelector(
+                  selected: _securityLevel,
+                  onChanged: (level) =>
+                      setState(() => _securityLevel = level),
+                ),
+                const SizedBox(height: 28),
+
+                // ── Submit button ───────────────────────────────────────
+                GestureDetector(
+                  onTap: _submit,
+                  child: Container(
+                    width: double.infinity,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF6C63FF), Color(0xFF48A8F8)],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF6C63FF).withValues(alpha: 0.4),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        'Create Account',
+                        style: GoogleFonts.outfit(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                Center(
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      'Already have an account? Sign in',
+                      style:
+                          TextStyle(color: Color(0xFF9F97FF), fontSize: 14),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Security Level Selector Widget
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _SecurityLevelOption {
+  final String value;
+  final String label;
+  final String subtitle;
+  final String example; // ghost count example for a 6-char password
+  final IconData icon;
+  const _SecurityLevelOption({
+    required this.value,
+    required this.label,
+    required this.subtitle,
+    required this.example,
+    required this.icon,
+  });
+}
+
+const _kLevels = [
+  _SecurityLevelOption(
+    value: 'normal',
+    label: 'Normal',
+    subtitle: 'Balanced security & speed',
+    example: '~2 ghost nodes per 6 chars',
+    icon: Icons.shield_outlined,
+  ),
+  _SecurityLevelOption(
+    value: 'strong',
+    label: 'Strong',
+    subtitle: 'More ghost nodes, harder to guess',
+    example: '~3 ghost nodes per 6 chars',
+    icon: Icons.security,
+  ),
+  _SecurityLevelOption(
+    value: 'powerful',
+    label: 'Powerful',
+    subtitle: 'Equal ghost & real nodes',
+    example: '~6 ghost nodes per 6 chars',
+    icon: Icons.verified_user,
+  ),
+];
+
+class _SecurityLevelSelector extends StatelessWidget {
+  final String selected;
+  final ValueChanged<String> onChanged;
+
+  const _SecurityLevelSelector({
+    required this.selected,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: _kLevels.map((opt) {
+        final isSelected = selected == opt.value;
+        return GestureDetector(
+          onTap: () => onChanged(opt.value),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? const Color(0xFF6C63FF).withValues(alpha: 0.15)
+                  : const Color(0xFF1E1B38),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isSelected
+                    ? const Color(0xFF6C63FF)
+                    : Colors.white.withValues(alpha: 0.08),
+                width: isSelected ? 1.5 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? const Color(0xFF6C63FF).withValues(alpha: 0.25)
+                        : Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    opt.icon,
+                    color: isSelected
+                        ? const Color(0xFF6C63FF)
+                        : Colors.white38,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.check_circle, color: Colors.greenAccent),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(_success!,
-                            style:
-                                const TextStyle(color: Colors.greenAccent)),
+                      Text(
+                        opt.label,
+                        style: GoogleFonts.outfit(
+                          color:
+                              isSelected ? Colors.white : Colors.white70,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        opt.subtitle,
+                        style: TextStyle(
+                          color: isSelected
+                              ? Colors.white60
+                              : Colors.white38,
+                          fontSize: 11,
+                        ),
+                      ),
+                      Text(
+                        opt.example,
+                        style: TextStyle(
+                          color: isSelected
+                              ? const Color(0xFF9F97FF)
+                              : Colors.white24,
+                          fontSize: 10,
+                        ),
                       ),
                     ],
                   ),
                 ),
-
-              // Error banner
-              if (_error != null) ...[
-                ErrorBanner(
-                  message: _error!,
-                  onDismiss: () => setState(() => _error = null),
-                ),
-                const SizedBox(height: 16),
+                if (isSelected)
+                  const Icon(Icons.check_circle,
+                      color: Color(0xFF6C63FF), size: 20)
+                else
+                  const Icon(Icons.radio_button_unchecked,
+                      color: Colors.white24, size: 20),
               ],
-
-              // Username
-              Text('Username',
-                  style: GoogleFonts.outfit(
-                      color: Colors.white60, fontSize: 13)),
-              const SizedBox(height: 6),
-              TextField(
-                controller: _usernameController,
-                style: const TextStyle(color: Colors.white),
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: const Color(0xFF1E1B38),
-                  hintText: 'e.g. john_doe',
-                  hintStyle: const TextStyle(color: Colors.white30),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  prefixIcon:
-                      const Icon(Icons.person_outline, color: Colors.white38),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Password field
-              _buildPasswordField(
-                label: 'Set Password',
-                fieldKey: 'password',
-                value: _password,
-                visible: _showPassword,
-                onToggleVisibility: () =>
-                    setState(() => _showPassword = !_showPassword),
-                hint: 'tap keys below to type',
-              ),
-              const SizedBox(height: 16),
-
-              // Confirm Password field (directly below Password)
-              _buildPasswordField(
-                label: 'Confirm Password',
-                fieldKey: 'confirm',
-                value: _confirmPassword,
-                visible: _showConfirm,
-                onToggleVisibility: () =>
-                    setState(() => _showConfirm = !_showConfirm),
-                hint: 'tap here, then type to confirm',
-              ),
-              const SizedBox(height: 20),
-
-              // Randomized keyboard
-              RandomizedKeyboard(
-                onChar: _onChar,
-                onDelete: _onDelete,
-                onConfirm: _onConfirm,
-              ),
-              const SizedBox(height: 20),
-              Center(
-                child: TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text(
-                    'Already have an account? Sign in',
-                    style: TextStyle(color: Color(0xFF9F97FF)),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      }).toList(),
     );
   }
 }

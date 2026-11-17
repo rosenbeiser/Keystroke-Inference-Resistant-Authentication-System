@@ -55,15 +55,16 @@ class GridState extends ChangeNotifier {
   bool get isLocked => _isLocked;
   String? get lockedMessage => _lockedMessage;
 
-  /// The node that is currently awaiting user selection.
+  /// The node currently awaiting user selection.
+  /// Nodes are delivered in sequential order from the server
+  /// (node 0 = password char 0, node 1 = password char 1, …).
   GridNode? get activeNode {
     if (_session == null) return null;
-    final nodes = _session!.nodes;
-    final sorted = List<GridNode>.from(nodes)
+    // Nodes are in password-sequential order; step = number of selections made.
+    final step = _selections.length;
+    final sorted = List<GridNode>.from(_session!.nodes)
       ..sort((a, b) => a.nodeIndex.compareTo(b.nodeIndex));
-    if (_activeNodeIndex < sorted.length) {
-      return sorted[_activeNodeIndex];
-    }
+    if (step < sorted.length) return sorted[step];
     return null;
   }
 

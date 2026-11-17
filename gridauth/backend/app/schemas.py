@@ -11,13 +11,26 @@ from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
 
 
+# Valid security levels
+_VALID_SECURITY_LEVELS = {"normal", "strong", "powerful"}
+
+
 # ------------------------------------------------------------------ #
 # Registration
 # ------------------------------------------------------------------ #
 
 class RegisterRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-\.]+$")
-    password: str = Field(..., min_length=8, max_length=128)
+    password: str = Field(..., min_length=6, max_length=128)
+    security_level: str = Field("normal", description="Ghost node density: normal | strong | powerful")
+
+    @field_validator("security_level")
+    @classmethod
+    def validate_security_level(cls, v: str) -> str:
+        v = v.lower().strip()
+        if v not in _VALID_SECURITY_LEVELS:
+            raise ValueError(f"security_level must be one of: {', '.join(sorted(_VALID_SECURITY_LEVELS))}")
+        return v
 
     @field_validator("password")
     @classmethod

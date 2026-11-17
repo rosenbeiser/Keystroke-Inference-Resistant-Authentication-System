@@ -196,7 +196,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 32),
-                Center(
+                const Center(
                   child: Text(
                     'Your password is never entered directly.\nAuthenticate through a randomized grid.',
                     textAlign: TextAlign.center,

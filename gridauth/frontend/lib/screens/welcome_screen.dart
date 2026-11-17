@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
 import 'login_screen.dart';
 import 'registration_screen.dart';
+import 'server_settings_screen.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -13,6 +14,21 @@ class WelcomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0D0B1E),
+      // Gear icon — opens Server Settings so the user can change IP in-app
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined, color: Colors.white38),
+            tooltip: 'Server Settings',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ServerSettingsScreen()),
+            ),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -94,7 +110,8 @@ class WelcomeScreen extends StatelessWidget {
                   label: 'Create Account',
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const RegistrationScreen()),
+                    MaterialPageRoute(
+                        builder: (_) => const RegistrationScreen()),
                   ),
                 ),
               ),
@@ -162,7 +179,8 @@ class _SecondaryButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFF6C63FF).withValues(alpha: 0.5)),
+          border: Border.all(
+              color: const Color(0xFF6C63FF).withValues(alpha: 0.5)),
         ),
         child: Center(
           child: Text(

@@ -25,7 +25,7 @@ from app.crypto.key_manager import key_manager
 from app.repositories.lockout_repo import LockoutRepository
 from app.repositories.session_repo import SessionRepository
 from app.repositories.user_repo import UserRepository
-from app.services.grid_service import build_grid
+from app.services.grid_service import build_grid, ghost_count_for_level
 from app.services.lockout_service import LockoutService
 
 logger = logging.getLogger(__name__)
@@ -61,7 +61,7 @@ class AuthService:
     # FR-01: Registration
     # ------------------------------------------------------------------ #
 
-    def register_user(self, username: str, password: str) -> None:
+    def register_user(self, username: str, password: str, security_level: str = "normal") -> None:
         """
         Register a new user.
 
@@ -69,7 +69,7 @@ class AuthService:
           1. Validate username availability.
           2. Hash password with Argon2id.
           3. Encrypt each character individually with AES-256-GCM.
-          4. Persist user, hash, and encrypted characters atomically.
+          4. Persist user (with security_level), hash, and encrypted characters atomically.
           5. Zero the plaintext password from local variables immediately.
 
         Raises RegistrationError on validation failure or duplicate username.
@@ -94,12 +94,12 @@ class AuthService:
             gc.collect()
 
         # Step 4: Persist atomically
-        user = self._user_repo.create_user(username)
+        user = self._user_repo.create_user(username, security_level=security_level)
         self._user_repo.set_password_hash(user.id, password_hash)
         self._user_repo.set_password_characters(user.id, encrypted_chars)
         self._db.commit()
 
-        logger.info("User registered: username=%s", username)
+        logger.info("User registered: username=%s security_level=%s", username, security_level)
 
     # ------------------------------------------------------------------ #
     # FR-03 / FR-05: Grid session creation
@@ -142,11 +142,12 @@ class AuthService:
         if not password_chars:
             raise AuthError("Invalid credentials.")
 
-        # Build randomized grid
+        # Build randomized grid — ghost count is derived from the user's chosen security level
+        ghost_count = ghost_count_for_level(len(password_chars), user.security_level)
         nodes, real_node_indices = build_grid(
             password_chars=password_chars,
             k=settings.grid_chars_per_node,
-            ghost_count=settings.grid_ghost_nodes,
+            ghost_count=ghost_count,
         )
 
         # Zero decrypted password characters immediately after grid construction

@@ -26,8 +26,8 @@ class UserRepository:
     def get_by_id(self, user_id: int) -> User | None:
         return self._db.query(User).filter(User.id == user_id).first()
 
-    def create_user(self, username: str) -> User:
-        user = User(username=username)
+    def create_user(self, username: str, security_level: str = "normal") -> User:
+        user = User(username=username, security_level=security_level)
         self._db.add(user)
         self._db.flush()  # get id without committing
         return user

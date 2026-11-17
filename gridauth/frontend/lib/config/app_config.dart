@@ -14,7 +14,7 @@ class AppConfig {
   //
   // Your phone and PC must be on the SAME Wi-Fi network.
   // ------------------------------------------------------------------ //
-  static const String baseUrl = 'http://192.168.0.103:8000'; // Your PC's Wi-Fi LAN IP
+  static const String baseUrl = "http://192.168.0.112:8000"; // Your PC's Wi-Fi LAN IP
   static const String apiPrefix = '/api/v1';
 
   // ------------------------------------------------------------------ //

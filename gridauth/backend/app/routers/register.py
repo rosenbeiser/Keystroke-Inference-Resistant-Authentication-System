@@ -38,7 +38,7 @@ async def register(
 ) -> RegisterResponse:
     svc = AuthService(db)
     try:
-        svc.register_user(body.username, body.password)
+        svc.register_user(body.username, body.password, security_level=body.security_level)
     except RegistrationError as e:
         # Use 409 for duplicate — specific enough for UX, generic enough for security
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
